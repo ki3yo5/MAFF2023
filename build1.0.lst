@@ -1,0 +1,370 @@
+GAMS 45.1.0  88bbff72 Oct 14, 2023          WEX-WEI x86 64bit/MS Windows - 11/24/23 23:11:13 Page 1
+Nutrition-Cropping Optimization Model
+C o m p i l a t i o n
+
+
+   2   
+      Build 1.0
+       
+      Simple model with 7 crops and calorie and PCF balance only.
+      Contstraints on land size (1ha) only.
+      Nutrient balance per day per family (4 adults) is optimized.
+       
+      Ishikawa K., Pre-simulation for DSS-ESSA Model. The MAFF Open Lab, 2023.
+  12   
+  13   
+  14   
+GAMS 45.1.0  88bbff72 Oct 14, 2023          WEX-WEI x86 64bit/MS Windows - 11/24/23 23:11:13 Page 2
+Nutrition-Cropping Optimization Model
+Input Data
+
+
+  16  Set
+  17     c 'crops'  / wheat, corn, beans, onions, potatoes, rice, tomato        /
+  18     t 'period' / jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec /
+  19     n 'nutrients' / calorie '1000 cal',  protein 'grams',  fat 'grams',  carbonhydrate 'grams'/ ;
+  20   
+  21  Table landreq(t,c) 'months of land occupation by crop (hectares)'
+  22           wheat   corn   beans  onions  potatoes  rice   tomato
+  23     jan     1.     1.     1.      1.
+  24     feb     1.     1.     1.      1.
+  25     mar     1.      .5    1.      1.       .5
+  26     apr     1.            1.      1.      1.       .25
+  27     may     1.                     .25    1.      1.
+  28     jun                                   1.      1.
+  29     jul                                   1.      1.       .75
+  30     aug                                   1.      1.      1.
+  31     sep                                   1.      1.      1.
+  32     oct                                   1.      1.      1.
+  33     nov      .5     .25    .25     .5      .75     .5      .75
+  34     dec     1.     1.     1.      1.                         ;
+  35   
+  36  Table a(c,n) 'nutritive value of foods (per 100g)'
+  37                  calorie   protein     fat    carbonhydrate
+  38  *                (1000)       (g)     (g)        (g)
+  39     wheat           329       10.8     3.1        72.1
+  40     corn             89        5.4     2.6        25.2
+  41     beans           372       33.8    19.7        29.5
+  42     onions           33        1        .1         8.4
+  43     potatoes         59        1.8      .1        17.3
+  44     rice            156        2.5      .3        37.1
+  45     tomato           20         .7      .1         4.7 ;
+  46   
+  47  Parameters
+  48     yield(c)   'crop yield (tons per hectare)'
+  49                / wheat      5,    corn  9,     beans  1.7,  onions  48
+  50                  potatoes  33,    rice  5.4,   tomato 64              /
+  51     intake(n)  'required daily intake of nutrients'
+  52                / calorie   2400,   protein   70,  fat   50,  carbonhydrate  300 /;
+  53   
+  54  Scalar
+  55     land       'land size   (hectares)'      /   1.  /
+  56     pop        'population size (head)'      /   4.  /
+  57     weight     'weight on calorie balance'   /  .75  /;
+  58   
+  59   
+  60   
+GAMS 45.1.0  88bbff72 Oct 14, 2023          WEX-WEI x86 64bit/MS Windows - 11/24/23 23:11:13 Page 3
+Nutrition-Cropping Optimization Model
+Endogenous Variables and Equations
+
+
+  62  Variable
+  63     xcrop(c)      'cropping activity      (hectares)'
+  64     calorie       'calorie deficit        (1000 cal)'
+  65     diet          'change in diet         (grams)'
+  66     target        'nutrient balance               ' ;
+  67   
+  68  Positive Variable xcrop;
+  69   
+  70  Equation
+  71     landbal(t)    'land balance           (hectares)'
+  72     caloriebal    'calorie balance        (1000 cal)'
+  73     dietbal       'diet balance           (grams)'
+  74     objective     'objective function            ' ;
+  75   
+  76  landbal(t)..   sum(c, xcrop(c)*landreq(t,c))  =l= land ;
+  77   
+  78  caloriebal..   calorie =e= sum(c, intake("calorie") - xcrop(c)*yield(c)*a(c,"calorie")*10000/(365*pop)) ;
+  79   
+  80  dietbal..      diet    =e= sum((n,c), intake(n)-xcrop(c)*yield(c)*a(c,n)*10000/(365*pop)) - calorie ;
+  81   
+  82  objective..    target  =e= weight*calorie + (1-weight)*diet ;
+  83   
+  84  Model presim 'Nutrition-Cropping Optimization Model' / all /;
+  85   
+  86  solve presim minimizing target using lp ;
+  87   
+  88   
+  89   
+GAMS 45.1.0  88bbff72 Oct 14, 2023          WEX-WEI x86 64bit/MS Windows - 11/24/23 23:11:13 Page 4
+Nutrition-Cropping Optimization Model
+Report on Solution
+
+
+  91  Set
+  92     crep  / landuse, output /
+  93     nrep  / required, intake, deficit /;
+  94   
+  95  Parameter
+  96     croprep      'crop report summary'
+  97     dietrep      'nutrient summary';
+  98   
+  99  croprep("landuse",c)  = xcrop.l(c);
+ 100  croprep("output",c)   = xcrop.l(c)*yield(c);
+ 101  croprep(crep,"total") = sum(c, croprep(crep,c));
+ 102   
+ 103  dietrep("required",n) = intake(n);
+ 104  dietrep("intake",n)   = sum(c, xcrop.l(c)*yield(c)*a(c,n)*10000/(365*pop));
+ 105  dietrep("deficit",n)  = intake(n)-dietrep("intake",n);
+ 106   
+ 107  display "landuse -- hectares "
+ 108          "output  -- tons     "
+ 109          "diet    -- 1000cal/grams per day"
+ 110          , croprep, dietrep;
+
+
+COMPILATION TIME     =        0.000 SECONDS      3 MB  45.1.0 88bbff72 WEX-WEI
+GAMS 45.1.0  88bbff72 Oct 14, 2023          WEX-WEI x86 64bit/MS Windows - 11/24/23 23:11:13 Page 5
+Nutrition-Cropping Optimization Model
+Equation Listing    SOLVE presim Using LP From line 86
+
+
+---- landbal  =L=  land balance           (hectares)
+
+landbal(jan)..  xcrop(wheat) + xcrop(corn) + xcrop(beans) + xcrop(onions) =L= 1 ; (LHS = 0)
+     
+landbal(feb)..  xcrop(wheat) + xcrop(corn) + xcrop(beans) + xcrop(onions) =L= 1 ; (LHS = 0)
+     
+landbal(mar)..  xcrop(wheat) + 0.5*xcrop(corn) + xcrop(beans) + xcrop(onions) + 0.5*xcrop(potatoes) =L= 1 ; (LHS = 0)
+     
+REMAINING 9 ENTRIES SKIPPED
+
+
+---- caloriebal  =E=  calorie balance        (1000 cal)
+
+caloriebal..  11267.1232876712*xcrop(wheat) + 5486.30136986301*xcrop(corn) + 4331.50684931507*xcrop(beans) + 10849.3150684932*xcrop(onions) + 13335.6164383562*xcrop(potatoes) + 5769.86301369863*xcrop(rice) + 8767.12328767123*xcrop(tomato) + calorie =E= 16800 ; (LHS = 0, INFES = 16800 ****)
+     
+
+---- dietbal  =E=  diet balance           (grams)
+
+dietbal..  14212.3287671233*xcrop(wheat) + 7532.87671232877*xcrop(corn) + 5297.94520547945*xcrop(beans) + 13972.602739726*xcrop(onions) + 17675.3424657534*xcrop(potatoes) + 7245.61643835616*xcrop(rice) + 11178.0821917808*xcrop(tomato) + calorie + diet =E= 19740 ; (LHS = 0, INFES = 19740 ****)
+     
+
+---- objective  =E=  objective function            
+
+objective..  - 0.75*calorie - 0.25*diet + target =E= 0 ; (LHS = 0)
+     
+GAMS 45.1.0  88bbff72 Oct 14, 2023          WEX-WEI x86 64bit/MS Windows - 11/24/23 23:11:13 Page 6
+Nutrition-Cropping Optimization Model
+Column Listing      SOLVE presim Using LP From line 86
+
+
+---- xcrop  cropping activity      (hectares)
+
+xcrop(wheat)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       landbal(jan)
+        1       landbal(feb)
+        1       landbal(mar)
+        1       landbal(apr)
+        1       landbal(may)
+        0.5     landbal(nov)
+        1       landbal(dec)
+    11267.1233  caloriebal
+    14212.3288  dietbal
+
+xcrop(corn)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       landbal(jan)
+        1       landbal(feb)
+        0.5     landbal(mar)
+        0.25    landbal(nov)
+        1       landbal(dec)
+     5486.3014  caloriebal
+     7532.8767  dietbal
+
+xcrop(beans)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       landbal(jan)
+        1       landbal(feb)
+        1       landbal(mar)
+        1       landbal(apr)
+        0.25    landbal(nov)
+        1       landbal(dec)
+     4331.5068  caloriebal
+     5297.9452  dietbal
+
+REMAINING 4 ENTRIES SKIPPED
+
+---- calorie  calorie deficit        (1000 cal)
+
+calorie
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       caloriebal
+        1       dietbal
+       -0.75    objective
+
+
+---- diet  change in diet         (grams)
+
+diet
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       dietbal
+       -0.25    objective
+
+
+---- target  nutrient balance               
+
+target
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       objective
+
+GAMS 45.1.0  88bbff72 Oct 14, 2023          WEX-WEI x86 64bit/MS Windows - 11/24/23 23:11:13 Page 7
+Nutrition-Cropping Optimization Model
+Range Statistics    SOLVE presim Using LP From line 86
+
+
+RANGE STATISTICS (ABSOLUTE NON-ZERO FINITE VALUES)
+
+RHS       [min, max] : [ 1.000E+00, 1.974E+04] - Zero values observed as well
+Bound     [min, max] : [        NA,        NA] - Zero values observed as well
+Matrix    [min, max] : [ 2.500E-01, 1.768E+04]
+
+GAMS 45.1.0  88bbff72 Oct 14, 2023          WEX-WEI x86 64bit/MS Windows - 11/24/23 23:11:13 Page 8
+Nutrition-Cropping Optimization Model
+Model Statistics    SOLVE presim Using LP From line 86
+
+
+MODEL STATISTICS
+
+BLOCKS OF EQUATIONS           4     SINGLE EQUATIONS           15
+BLOCKS OF VARIABLES           4     SINGLE VARIABLES           10
+NON ZERO ELEMENTS            67
+
+
+GENERATION TIME      =        0.016 SECONDS      4 MB  45.1.0 88bbff72 WEX-WEI
+GAMS 45.1.0  88bbff72 Oct 14, 2023          WEX-WEI x86 64bit/MS Windows - 11/24/23 23:11:13 Page 9
+Nutrition-Cropping Optimization Model
+Solution Report     SOLVE presim Using LP From line 86
+
+
+               S O L V E      S U M M A R Y
+
+     MODEL   presim              OBJECTIVE  target
+     TYPE    LP                  DIRECTION  MINIMIZE
+     SOLVER  CPLEX               FROM LINE  86
+
+**** SOLVER STATUS     1 Normal Completion
+**** MODEL STATUS      1 Optimal
+**** OBJECTIVE VALUE            -2378.0137
+
+ RESOURCE USAGE, LIMIT          0.015 10000000000.000
+ ITERATION COUNT, LIMIT         4    2147483647
+*** This solver runs with a demo license. No commercial use.
+--- GMO setup time: 0.00s
+--- GMO memory 0.50 Mb (peak 0.50 Mb)
+--- Dictionary memory 0.00 Mb
+--- Cplex 22.1.1.0 link memory 0.00 Mb (peak 0.00 Mb)
+--- Starting Cplex
+
+
+--- LP status (1): optimal.
+--- Cplex Time: 0.02sec (det. 0.03 ticks)
+
+
+Optimal solution found
+Objective:        -2378.013699
+
+
+---- EQU landbal  land balance           (hectares)
+
+           LOWER          LEVEL          UPPER         MARGINAL
+
+jan        -INF            1.0000         1.0000          .          
+feb        -INF            1.0000         1.0000          .          
+mar        -INF            1.0000         1.0000          .          
+apr        -INF            1.0000         1.0000     -3908.5616      
+may        -INF            1.0000         1.0000          .          
+jun        -INF            1.0000         1.0000          .          
+jul        -INF            1.0000         1.0000          .          
+aug        -INF            1.0000         1.0000          .          
+sep        -INF            1.0000         1.0000          .          
+oct        -INF            1.0000         1.0000          .          
+nov        -INF            1.0000         1.0000     -9570.7763      
+dec        -INF            1.0000         1.0000     -2233.6758      
+
+                           LOWER          LEVEL          UPPER         MARGINAL
+
+---- EQU caloriebal     16800.0000     16800.0000     16800.0000         0.5000      
+---- EQU dietbal        19740.0000     19740.0000     19740.0000         0.2500      
+---- EQU objective           .              .              .             1.0000      
+
+  caloriebal  calorie balance        (1000 cal)
+  dietbal  diet balance           (grams)
+  objective  objective function            
+
+---- VAR xcrop  cropping activity      (hectares)
+
+                LOWER          LEVEL          UPPER         MARGINAL
+
+wheat             .              .            +INF         1740.9817      
+corn              .             1.0000        +INF             .          
+beans             .              .            +INF         5044.6918      
+onions            .              .            +INF         2009.8174      
+potatoes          .             1.0000        +INF             .          
+rice              .              .            +INF         1066.1929      
+tomato            .              .            +INF             .          
+
+                           LOWER          LEVEL          UPPER         MARGINAL
+
+---- VAR calorie           -INF        -2021.9178        +INF             .          
+---- VAR diet              -INF        -3446.3014        +INF             .          
+---- VAR target            -INF        -2378.0137        +INF             .          
+
+  calorie  calorie deficit        (1000 cal)
+  diet  change in diet         (grams)
+  target  nutrient balance               
+
+
+**** REPORT SUMMARY :        0     NONOPT
+                             0 INFEASIBLE
+                             0  UNBOUNDED
+GAMS 45.1.0  88bbff72 Oct 14, 2023          WEX-WEI x86 64bit/MS Windows - 11/24/23 23:11:13 Page 10
+Nutrition-Cropping Optimization Model
+E x e c u t i o n
+
+
+----    107 landuse -- hectares 
+            output  -- tons     
+            diet    -- 1000cal/grams per day
+
+----    107 PARAMETER croprep  crop report summary
+
+               corn    potatoes       total
+
+landuse       1.000       1.000       2.000
+output        9.000      33.000      42.000
+
+
+----    107 PARAMETER dietrep  nutrient summary
+
+             calorie     protein         fat  carbonhyd~
+
+required    2400.000      70.000      50.000     300.000
+intake     18821.918     739.726     182.877    5463.699
+deficit   -16421.918    -669.726    -132.877   -5163.699
+
+
+
+EXECUTION TIME       =        0.047 SECONDS      4 MB  45.1.0 88bbff72 WEX-WEI
+
+
+USER: GAMS Demo, for EULA and demo limitations see   G230930/0001CB-GEN
+      https://www.gams.com/latest/docs/UG%5FLicense.html         DC0000
+
+
+**** FILE SUMMARY
+
+Input      C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\build1.0.gms
+Output     C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\build1.0.lst
