@@ -1,0 +1,812 @@
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 1
+Nutrition-Cropping Optimization Model
+C o m p i l a t i o n
+
+
+   2   
+      Build 1.1 Dec 12 2023
+       
+      Cropping model with 16 crops but without livestock and processing foods.
+      Objective function is calorie deficit and nutrient intake balance only.
+      Contstraints on pooled land size and 250% margin for each cropiing area.
+      Calorie and nutrient balance is optimized for the total population per day.
+       
+      Ishikawa K., Pre-simulation for DSS-ESSA Model. The MAFF Open Lab, 2023.
+  13   
+  17   
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 2
+Nutrition-Cropping Optimization Model
+Input Data
+
+
+  19  Set
+  20     c 'crops'  /
+  21     rice
+  22     wheat
+  23     barley
+  24     naked
+  25     corn
+  26     sorghum
+  27     mis_grains
+  28     sweetp
+  29     potato
+  30     soy
+  31     mis_beans
+  32     green_veges
+  33     mis_veges
+  34     mandarin
+  35     apple
+  36     mis_fruits /
+  37     t 'period' /
+  38     jan
+  39     feb
+  40     mar
+  41     apr
+  42     may
+  43     jun
+  44     jul
+  45     aug
+  46     sep
+  47     oct
+  48     nov
+  49     dec /
+  50     n 'nutrients' /
+  51     calorie       'kcal'
+  52     protein       'grams'
+  53     fat           'grams'
+  54     carbonhydrate 'grams'
+  55     pop           'population (million)'
+  56     supplypy      'supply per year (kg)'
+  57     supplypd      'supply per day (grams)'/
+  58     a 'age' /
+  59     0-1
+  60     1-2
+  61     3-5
+  62     6-7
+  63     8-9
+  64     10-11
+  65     12-14
+  66     15-17
+  67     18-29
+  68     30-49
+  69     50-64
+  70     65-74
+  71     75- /
+  72     p 'production' /
+  73     area         '1000ha'
+  74     yield        't per ha'
+  75     prod         '1000t'
+  76     import       '1000t'
+  77     export       '1000t'
+  78     stock        '1000t'
+  79     total        '1000t'
+  80     feed         '1000t'
+  81     seed         '1000t'
+  82     processing   '1000t'
+  83     passenger    '1000t'
+  84     wear         '1000t'
+  85     gross        '1000t'
+  86     g2n          'percent'
+  87     net          '1000t' /
+  88     g 'gender' /
+  89     male
+  90     female/
+  91     v 'value' /
+  92     pc           'percapita per day'
+  93     value        'nutrients in net food 100g'/;
+  94   
+  95  parameter
+  96    data(c,p)      Production data
+  97    landreq(c,t)   Months of land occupation by crop (hectares)
+  98    intake(a,g,n)  Required daily intake of nutrients
+  99    nvalue(c,v,n)  Nutritive supply and value of foods;
+ 100   
+GDXIN   C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\prod.gdx
+--- LOAD  data = 1:data
+ 104   
+GDXIN   C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\landreq.gdx
+--- LOAD  landreq = 1:landreq
+ 108   
+GDXIN   C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\intake.gdx
+--- LOAD  intake = 1:intake
+ 112   
+GDXIN   C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\nvalue.gdx
+--- LOAD  nvalue = 1:nvalue
+ 116   
+ 117  Scalar
+ 118     land       'total land size (1000ha)'        /  4325  /
+ 119     paddy      'paddy field (1000ha)'            /  2352  /
+ 120     upland     'total upland field (1000ha)'     /  1973  /
+ 121     cropl      'cropping field (1000ha)'         /  1123  /
+ 122     orchard    'orchard (1000ha)'                /   259  /
+ 123     pasture    'pasture (1000ha)'                /   591  /
+ 124     aweight    'weight on cropping are balance'  /   2.5  /
+ 125     nweight    'weight on calorie balance'       /   .75  /
+ 126     fweight    'weight on change in diet'        /   .25  /
+ 127     item       'number of food items'            /    16  /;
+ 128   
+ 129   
+ 130   
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 3
+Nutrition-Cropping Optimization Model
+Agents for calculation
+
+
+ 132  Set
+ 133     nn   /calorie, protein, fat, carbonhydrate/;
+ 134   
+ 135  Parameter
+ 136     pintake(a,g,nn)       'Required daily intake of nutrients (kcal grams/million)'
+ 137     t2g(c)                'Ratio of total food to gross food (percent)'
+ 138     g2n(c)                'Ration of gross food to net food (percent)'
+ 139     nnvalue(c,nn)         'Nutritive value of foods (kcal grams/netfood 100g)'
+ 140     nnpc(c)               'Current daily intake of nutrients (grams/capita)'
+ 141     tpop                  'National population (million)';
+ 142   
+ 143  pintake(a,g,"calorie") = intake(a,g,"pop") * intake(a,g,"calorie");
+ 144  pintake(a,g,"protein") = intake(a,g,"pop") * intake(a,g,"protein");
+ 145  pintake(a,g,"fat") = intake(a,g,"pop") * intake(a,g,"fat");
+ 146  pintake(a,g,"carbonhydrate") = intake(a,g,"pop") * intake(a,g,"carbonhydrate");
+ 147   
+ 148  t2g(c) = 100 * data(c,"gross") / data(c,"total");
+ 149  g2n(c) = data(c,"g2n");
+ 150   
+ 151  nnvalue(c,"calorie") = nvalue(c,"value","calorie");
+ 152  nnvalue(c,"protein") = nvalue(c,"value","protein");
+ 153  nnvalue(c,"fat") = nvalue(c,"value","fat");
+ 154  nnvalue(c,"carbonhydrate") = nvalue(c,"value","carbonhydrate");
+ 155   
+ 156  nnpc(c) = nvalue(c,"pc","supplypd");
+ 157   
+ 158  tpop = sum((a,g), intake(a,g,"pop"));
+ 159   
+ 160  Display pintake, t2g, nnvalue, nnpc, tpop;
+ 161   
+ 162   
+ 163   
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 4
+Nutrition-Cropping Optimization Model
+Endogenous Variables and Equations
+
+
+ 165  Variable
+ 166     xcrop(c)      'Cropping area          (1000ha)'
+ 167     ndeficit(nn)  'Deficit of nutrients   (kcal grams/capita)'
+ 168     cdeficit      'Deficit of calorie     (kcal      /capita)'
+ 169     delta(c)      'Change in diet         (     grams/capita)'
+ 170     target        'Target value to minimize' ;
+ 171   
+ 172  Positive Variable xcrop;
+ 173   
+ 174  Equation
+ 175     lbal(t)       'Land balance           (1000ha)'
+ 176     abal(c)       'Cropping area balance  (1000ha)'
+ 177     nbal(nn)      'Nutrients balance      (kcal grams/capita)'
+ 178     cbal          'Calorie balance        (kcal      /capita)'
+ 179     dbal(c)       'Change in diet         (     grams/capita)'
+ 180     objective     'Objective function' ;
+ 181   
+ 182  lbal(t)..   sum(c,xcrop(c)*landreq(c,t)) =l= land;
+ 183   
+ 184  abal(c)..   xcrop(c) =l= aweight*data(c,"area");
+ 185   
+ 186  nbal(nn)..  ndeficit(nn) =e=  sum((a,g),pintake(a,g,nn))/tpop
+ 187              - sum(c,xcrop(c)*data(c,"yield")*(t2g(c)/100)*(g2n(c)/100)*nnvalue(c,nn)*(10**7)/(tpop*(10**6)*365));
+ 188   
+ 189  cbal..      cdeficit =e= ndeficit("calorie");
+ 190   
+ 191  dbal(c)..   delta(c) =e= nnpc(c)-xcrop(c)*data(c,"yield")*(t2g(c)/100)*(g2n(c)/100)*(10**9)/(tpop*(10**6)*365);
+ 192   
+ 193  objective..   target =e= nweight*cdeficit + sum(c,(fweight/item)*delta(c));
+ 194   
+ 195  Model presim 'Nutrition-Cropping Optimization Model' / all /;
+ 196   
+ 197  solve presim minimizing target using nlp ;
+ 198   
+ 199   
+ 200   
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 5
+Nutrition-Cropping Optimization Model
+Report on Solution
+
+
+ 202  Set
+ 203     lrep  /
+ 204     landcul     'Land use by month          (1000ha)'/
+ 205     crep  /
+ 206     landuse     'Area cropped               (1000ha)'
+ 207     supply      'Total food supply          (1000t)'
+ 208     grossfood   'Gross food supply          (1000t)'
+ 209     netfood     'Net food supply            (1000t)'
+ 210     current     'Current intake             (grams/capita)'
+ 211     potential   'Potential intake           (grams/capita)'
+ 212     change      'Change in diet             (grams/capita)'/
+ 213     nrep  /
+ 214     required    'Required daily nutrients   (kcal grams/capita)'
+ 215     intake      'Intaken nutrients per day  (kcal grams/capita)'
+ 216     shortage    'Shortage per day           (kcal grams/capita)'
+ 217     ssrate      'Self sufficient rate       (percentage)       '/;
+ 218   
+ 219  Parameter
+ 220     landrep      'Land report summary'
+ 221     croprep      'Crop report summary'
+ 222     dietrep      'Nutrient summary';
+ 223   
+ 224  landrep(t,c) = xcrop.l(c)*landreq(c,t);
+ 225  landrep(t,"total") = sum(c,xcrop.l(c)*landreq(c,t));
+ 226   
+ 227  croprep(c,"landuse")   = xcrop.l(c);
+ 228  croprep(c,"supply")    = xcrop.l(c)*data(c,"yield");
+ 229  croprep(c,"grossfood") = xcrop.l(c)*data(c,"yield")*(t2g(c)/100);
+ 230  croprep(c,"netfood")   = xcrop.l(c)*data(c,"yield")*(t2g(c)/100)*(g2n(c)/100);
+ 231  croprep(c,"current")   = nnpc(c);
+ 232  croprep(c,"potential") = croprep(c,"netfood")*(10**9)/(tpop*(10**6)*365);
+ 233  croprep(c,"change")    = croprep(c,"netfood")*(10**9)/(tpop*(10**6)*365)-nnpc(c);
+ 234  croprep("total",crep)  = sum(c, croprep(c,crep));
+ 235   
+ 236  dietrep(nn,"required") = sum((a,g),pintake(a,g,nn))/tpop;
+ 237  dietrep(nn,"intake")   = sum(c,croprep(c,"netfood")*nnvalue(c,nn)*(10**7)/(tpop*(10**6)*365));
+ 238  dietrep(nn,"shortage") = dietrep(nn,"intake") - dietrep(nn,"required");
+ 239  dietrep(nn,"ssrate")   = 100*dietrep(nn,"intake") / dietrep(nn,"required");
+ 240   
+ 241  display "landuse   -- Cropped area              (1000ha)"
+ 242          "supply    -- Total food supply         (1000t)"
+ 243          "grossfood -- Gross food supply         (1000t)"
+ 244          "netfood   -- Net food supply           (1000t)"
+ 245          "current   -- Current intake            (grams/capita)"
+ 246          "potential -- Potential intake          (grams/capita)"
+ 247          "change    -- Change in daily diet      (grams/capita)"
+ 248          "required  -- Required daily nutrients  (kcal grams/capita)"
+ 249          "intake    -- Intaken nutrients per day (kcal grams/capita)"
+ 250          "shortage  -- Shortage per day          (kcal grams/capita)"
+ 251          "ssrate    -- Self sufficient rate      (percentage)"
+ 252          landrep, croprep, dietrep;
+ 253   
+ 254   
+ 255   
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 6
+Nutrition-Cropping Optimization Model
+Export Report
+
+
+ 257  Execute_Unload '.\results\1.1_results.gdx', landrep, croprep, dietrep;
+ 258   
+ 259  execute 'gdxxrw .\results\1.1_results.gdx o=.\results\1.1_results.xlsx par=landrep rng=landrep!A1 rdim=1 cdim=1'
+ 260  execute 'gdxxrw .\results\1.1_results.gdx o=.\results\1.1_results.xlsx par=croprep rng=croprep!A1 rdim=1 cdim=1'
+ 261  execute 'gdxxrw .\results\1.1_results.gdx o=.\results\1.1_results.xlsx par=dietrep rng=dietrep!A1 rdim=1 cdim=1'
+ 262   
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 7
+Nutrition-Cropping Optimization Model
+Include File Summary
+
+
+   SEQ   GLOBAL TYPE      PARENT   LOCAL  FILENAME
+
+     1        1 INPUT          0       0  C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\build1.1.gms
+     2      101 GDXIN          1     101  C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\prod.gdx
+     3      105 GDXIN          1     105  C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\landreq.gdx
+     4      109 GDXIN          1     109  C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\intake.gdx
+     5      113 GDXIN          1     113  C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\nvalue.gdx
+
+
+COMPILATION TIME     =        0.016 SECONDS      3 MB  32.2.0 rc62c018 WEX-WEI
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 8
+Nutrition-Cropping Optimization Model
+E x e c u t i o n
+
+
+----    160 PARAMETER pintake  Required daily intake of nutrients (kcal grams/million)
+
+                 calorie     protein         fat  carbonhyd~
+
+0-1  .male       255.625       8.323       7.669      38.344
+0-1  .female     223.675       7.274       6.710      33.551
+1-2  .male       808.450      26.275      24.253     121.268
+1-2  .female     730.800      23.751      21.924     109.620
+3-5  .male      1812.200      58.896      54.366     271.830
+3-5  .female    1662.500      54.031      49.875     249.375
+6-7  .male      1574.800      51.181      47.244     236.220
+6-7  .female    1402.150      45.570      42.064     210.322
+8-9  .male      1922.150      62.470      57.665     288.322
+8-9  .female    1681.300      54.642      50.439     252.195
+10-11.male      2403.000      78.098      72.090     360.450
+10-11.female    2135.700      69.410      64.071     320.355
+12-14.male      4295.200     139.594     128.856     644.280
+12-14.female    3770.400     122.538     113.112     565.560
+15-17.male      4648.000     151.060     139.440     697.200
+15-17.female    3624.800     117.806     108.744     543.720
+18-29.male     20354.650     661.526     610.639    3053.198
+18-29.female   14542.000     472.615     436.260    2181.300
+30-49.male     42627.600    1385.397    1278.828    6394.140
+30-49.female   31321.950    1017.963     939.658    4698.292
+50-64.male     32437.600    1054.222     973.128    4865.640
+50-64.female   24336.000     790.920     730.080    3650.400
+65-74.male     19368.000     629.460     581.040    2905.200
+65-74.female   16281.850     529.160     488.456    2442.278
+75-  .male     16073.400     522.385     482.202    2411.010
+75-  .female   19321.500     627.949     579.645    2898.225
+
+
+----    160 PARAMETER t2g  Ratio of total food to gross food (percent)
+
+rice        85.151,    wheat       78.374,    barley       3.104,    naked       74.194,    corn         0.709,    mis_grains  69.565,    sweetp      70.968,    potato      67.829,    soy         21.592,    mis_beans   83.073,    green_veges 89.879,    mis_veges   89.185,    mandarin    84.776,    apple       89.799,    mis_fruits  81.039
+
+
+----    160 PARAMETER nnvalue  Nutritive value of foods (kcal grams/netfood 100g)
+
+                calorie     protein         fat  carbonhyd~
+
+rice            342.000       6.100       0.900      77.375
+wheat           345.000      10.500       1.800      71.700
+barley          329.000       6.700       1.500      72.175
+naked           329.000       6.700       1.500      72.175
+corn            348.100       8.200       2.400      73.425
+sorghum         348.000       9.500       2.600      71.650
+mis_grains      338.100      11.700       3.000      66.075
+sweetp          126.000       1.200       0.200      29.850
+potato           59.000       1.800       0.100      12.725
+soy             396.700      33.300      21.400      17.725
+mis_beans       384.000      22.600      16.200      36.950
+green_veges      28.000       1.200       0.200       5.350
+mis_veges        27.300       1.300       0.200       5.075
+mandarin         48.000       0.600       0.100      11.175
+apple            53.000       0.100       0.200      12.700
+mis_fruits       83.500       1.400       2.600      13.625
+
+
+----    160 PARAMETER nnpc  Current daily intake of nutrients (grams/capita)
+
+rice        139.300,    wheat        86.700,    barley        0.600,    naked         0.300,    corn          1.500,    mis_grains    1.800,    sweetp       10.500,    potato       47.200,    soy          18.400,    mis_beans     6.200,    green_veges  71.700,    mis_veges   169.700,    mandarin      9.300,    apple        20.800,    mis_fruits   60.700
+
+
+----    160 PARAMETER tpop                 =      124.950  National population (million)
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 9
+Nutrition-Cropping Optimization Model
+Equation Listing    SOLVE presim Using NLP From line 197
+
+
+---- lbal  =L=  Land balance           (1000ha)
+
+lbal(jan)..  xcrop(wheat) + xcrop(barley) + xcrop(naked) + xcrop(mis_grains) + xcrop(green_veges) + xcrop(mis_veges) + xcrop(mandarin) + xcrop(apple) + xcrop(mis_fruits) =L= 4325 ; (LHS = 0)
+     
+lbal(feb)..  xcrop(wheat) + xcrop(barley) + xcrop(naked) + xcrop(mis_grains) + xcrop(green_veges) + xcrop(mis_veges) + xcrop(mandarin) + xcrop(apple) + xcrop(mis_fruits) =L= 4325 ; (LHS = 0)
+     
+lbal(mar)..  xcrop(wheat) + xcrop(barley) + xcrop(naked) + xcrop(mis_grains) + xcrop(green_veges) + xcrop(mis_veges) + xcrop(mandarin) + xcrop(apple) + xcrop(mis_fruits) =L= 4325 ; (LHS = 0)
+     
+REMAINING 9 ENTRIES SKIPPED
+
+
+---- abal  =L=  Cropping area balance  (1000ha)
+
+abal(rice)..  xcrop(rice) =L= 3907.5 ; (LHS = 0)
+     
+abal(wheat)..  xcrop(wheat) =L= 568.25 ; (LHS = 0)
+     
+abal(barley)..  xcrop(barley) =L= 143.5 ; (LHS = 0)
+     
+REMAINING 13 ENTRIES SKIPPED
+
+
+---- nbal  =E=  Nutrients balance      (kcal grams/capita)
+
+nbal(calorie)..  0.298805546179949*xcrop(rice) + 0.202086274659619*xcrop(wheat) + 0.00388358875775204*xcrop(barley) + 0.0884719844632506*xcrop(naked) + 0.00114419338878276*xcrop(corn) + 0.020719253007793*xcrop(mis_grains) + 0.392524239037197*xcrop(sweetp) + 0.252714113322153*xcrop(potato) + 0.03004980042556*xcrop(soy) + 0.118966366409694*xcrop(mis_beans) + 0.109852946707255*xcrop(green_veges) + 0.145005589004629*xcrop(mis_veges) + 0.125806986053469*xcrop(mandarin) + 0.186276220341247*xcrop(apple) + 0.098800638833664*xcrop(mis_fruits) + ndeficit(calorie) =E= 2157.78551420568 ; (LHS = 0, INFES = 2157.78551420568 ****)
+     
+nbal(protein)..  0.00532957260730318*xcrop(rice) + 0.00615045183746667*xcrop(wheat) + 7.90882816928228E-5*xcrop(barley) + 0.00180170910609051*xcrop(naked) + 2.69531335478847E-5*xcrop(corn) + 0.000716992783765684*xcrop(mis_grains) + 0.00373832608606854*xcrop(sweetp) + 0.00770992210135382*xcrop(potato) + 0.00252245614865427*xcrop(soy) + 0.00700166635640386*xcrop(mis_beans) + 0.00470798343031093*xcrop(green_veges) + 0.00690502804783947*xcrop(mis_veges) + 0.00157258732566836*xcrop(mandarin) + 0.000351464566681599*xcrop(apple) + 0.00165653765709137*xcrop(mis_fruits) + ndeficit(protein) =E= 70.1281908763506 ; (LHS = 0, INFES = 70.1281908763506 ****)
+     
+nbal(fat)..  0.000786330384684076*xcrop(rice) + 0.00105436317213714*xcrop(wheat) + 1.77063317222738E-5*xcrop(barley) + 0.000403367710318772*xcrop(naked) + 7.88872201401504E-6*xcrop(corn) + 0.000183844303529663*xcrop(mis_grains) + 0.00062305434767809*xcrop(sweetp) + 0.000428329005630768*xcrop(potato) + 0.00162103788532136*xcrop(soy) + 0.00501889358290896*xcrop(mis_beans) + 0.000784663905051822*xcrop(green_veges) + 0.00106231200735992*xcrop(mis_veges) + 0.000262097887611393*xcrop(mandarin) + 0.000702929133363198*xcrop(apple) + 0.00307642707745541*xcrop(mis_fruits) + ndeficit(fat) =E= 64.7335654261705 ; (LHS = 0, INFES = 64.7335654261705 ****)
+     
+REMAINING ENTRY SKIPPED
+
+
+---- cbal  =E=  Calorie balance        (kcal      /capita)
+
+cbal..  - ndeficit(calorie) + cdeficit =E= 0 ; (LHS = 0)
+     
+
+---- dbal  =E=  Change in diet         (     grams/capita)
+
+dbal(rice)..  0.0873700427426753*xcrop(rice) + delta(rice) =E= 139.3 ; (LHS = 0, INFES = 139.3 ****)
+     
+dbal(wheat)..  0.058575731785397*xcrop(wheat) + delta(wheat) =E= 86.7 ; (LHS = 0, INFES = 86.7 ****)
+     
+dbal(barley)..  0.00118042211481825*xcrop(barley) + delta(barley) =E= 0.6 ; (LHS = 0, INFES = 0.6 ****)
+     
+REMAINING 13 ENTRIES SKIPPED
+
+
+---- objective  =E=  Objective function
+
+objective..  - 0.75*cdeficit - 0.015625*delta(rice) - 0.015625*delta(wheat) - 0.015625*delta(barley) - 0.015625*delta(naked) - 0.015625*delta(corn) - 0.015625*delta(sorghum) - 0.015625*delta(mis_grains) - 0.015625*delta(sweetp) - 0.015625*delta(potato) - 0.015625*delta(soy) - 0.015625*delta(mis_beans) - 0.015625*delta(green_veges) - 0.015625*delta(mis_veges) - 0.015625*delta(mandarin) - 0.015625*delta(apple) - 0.015625*delta(mis_fruits) + target =E= 0 ; (LHS = 0)
+     
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 10
+Nutrition-Cropping Optimization Model
+Column Listing      SOLVE presim Using NLP From line 197
+
+
+---- xcrop  Cropping area          (1000ha)
+
+xcrop(rice)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       lbal(apr)
+        1       lbal(may)
+        1       lbal(jun)
+        1       lbal(jul)
+        1       lbal(aug)
+        1       lbal(sep)
+        1       lbal(oct)
+        1       abal(rice)
+        0.2988  nbal(calorie)
+        0.0053  nbal(protein)
+        0.0008  nbal(fat)
+        0.0676  nbal(carbonhydrate)
+        0.0874  dbal(rice)
+
+xcrop(wheat)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       lbal(jan)
+        1       lbal(feb)
+        1       lbal(mar)
+        1       lbal(apr)
+        1       lbal(may)
+        1       lbal(jun)
+        1       lbal(nov)
+        1       lbal(dec)
+        1       abal(wheat)
+        0.2021  nbal(calorie)
+        0.0062  nbal(protein)
+        0.0011  nbal(fat)
+        0.042   nbal(carbonhydrate)
+        0.0586  dbal(wheat)
+
+xcrop(barley)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+        1       lbal(jan)
+        1       lbal(feb)
+        1       lbal(mar)
+        1       lbal(apr)
+        1       lbal(may)
+        1       lbal(jun)
+        1       lbal(nov)
+        1       lbal(dec)
+        1       abal(barley)
+        0.0039  nbal(calorie)
+  7.9088282E-5  nbal(protein)
+  1.7706332E-5  nbal(fat)
+        0.0009  nbal(carbonhydrate)
+        0.0012  dbal(barley)
+
+REMAINING 13 ENTRIES SKIPPED
+
+---- ndeficit  Deficit of nutrients   (kcal grams/capita)
+
+ndeficit(calorie)
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       nbal(calorie)
+       -1       cbal
+
+ndeficit(protein)
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       nbal(protein)
+
+ndeficit(fat)
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       nbal(fat)
+
+REMAINING ENTRY SKIPPED
+
+---- cdeficit  Deficit of calorie     (kcal      /capita)
+
+cdeficit
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       cbal
+       -0.75    objective
+
+
+---- delta  Change in diet         (     grams/capita)
+
+delta(rice)
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       dbal(rice)
+       -0.0156  objective
+
+delta(wheat)
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       dbal(wheat)
+       -0.0156  objective
+
+delta(barley)
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       dbal(barley)
+       -0.0156  objective
+
+REMAINING 13 ENTRIES SKIPPED
+
+---- target  Target value to minimize
+
+target
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       objective
+
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 11
+Nutrition-Cropping Optimization Model
+Model Statistics    SOLVE presim Using NLP From line 197
+
+
+MODEL STATISTICS
+
+BLOCKS OF EQUATIONS           6     SINGLE EQUATIONS           50
+BLOCKS OF VARIABLES           5     SINGLE VARIABLES           38
+NON ZERO ELEMENTS           261     NON LINEAR N-Z              0
+DERIVATIVE POOL              20     CONSTANT POOL              16
+CODE LENGTH                   0
+
+
+GENERATION TIME      =        0.000 SECONDS      4 MB  32.2.0 rc62c018 WEX-WEI
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 12
+Nutrition-Cropping Optimization Model
+Solution Report     SOLVE presim Using NLP From line 197
+
+
+               S O L V E      S U M M A R Y
+
+     MODEL   presim              OBJECTIVE  target
+     TYPE    NLP                 DIRECTION  MINIMIZE
+     SOLVER  CONOPT              FROM LINE  197
+
+**** SOLVER STATUS     1 Normal Completion         
+**** MODEL STATUS      1 Optimal                   
+**** OBJECTIVE VALUE              654.5682
+
+ RESOURCE USAGE, LIMIT          0.000 10000000000.000
+ ITERATION COUNT, LIMIT         5    2147483647
+ EVALUATION ERRORS              0             0
+CONOPT 3         32.2.0 rc62c018 Released Aug 26, 2020 WEI x86 64bit/MS Window
+*** This solver runs with a community license.
+ 
+ 
+    C O N O P T 3   version 3.17L
+    Copyright (C)   ARKI Consulting and Development A/S
+                    Bagsvaerdvej 246 A
+                    DK-2880 Bagsvaerd, Denmark
+ 
+ 
+                   Pre-triangular equations:   1
+                   Post-triangular equations:  21
+ 
+ 
+ ** Optimal solution. There are no superbasic variables.
+ 
+ 
+ CONOPT time Total                            0.001 seconds
+   of which: Function evaluations             0.000 =  0.0%
+             1st Derivative evaluations       0.000 =  0.0%
+ 
+
+---- EQU lbal  Land balance           (1000ha)
+
+           LOWER          LEVEL          UPPER         MARGINAL
+
+jan        -INF          158.2500      4325.0000          .          
+feb        -INF          158.2500      4325.0000          .          
+mar        -INF          158.2500      4325.0000          .          
+apr        -INF         4155.0000      4325.0000          .          
+may        -INF         4284.6250      4325.0000          .          
+jun        -INF         4325.0000      4325.0000        -0.1525      
+jul        -INF         4325.0000      4325.0000        -0.0227      
+aug        -INF         4325.0000      4325.0000          .          
+sep        -INF         4325.0000      4325.0000          .          
+oct        -INF         4244.2500      4325.0000          .          
+nov        -INF          316.5000      4325.0000          .          
+dec        -INF          316.5000      4325.0000          .          
+
+---- EQU abal  Cropping area balance  (1000ha)
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+rice               -INF         3907.5000      3907.5000        -0.0503      
+wheat              -INF          158.2500       568.2500          .          
+barley             -INF             .           143.5000          .          
+naked              -INF             .            14.6750          .          
+corn               -INF             .             0.2500          .          
+sorghum            -INF             .             0.0378          .          
+mis_grains         -INF             .           164.4493          .          
+sweetp             -INF           80.7500        80.7500        -0.1241      
+potato             -INF          178.5000       178.5000        -0.0211      
+soy                -INF           70.0250       379.0000          .          
+mis_beans          -INF           88.2250        88.2250        -0.0671      
+green_veges        -INF             .           272.8650          .          
+mis_veges          -INF             .           641.1775          .          
+mandarin           -INF             .            90.5000          .          
+apple              -INF             .            87.7500          .          
+mis_fruits         -INF             .           236.8700          .          
+
+---- EQU nbal  Nutrients balance      (kcal grams/capita)
+
+                     LOWER          LEVEL          UPPER         MARGINAL
+
+calorie            2157.7855      2157.7855      2157.7855         0.7500      
+protein              70.1282        70.1282        70.1282         EPS         
+fat                  64.7336        64.7336        64.7336         EPS         
+carbonhydrate       323.6678       323.6678       323.6678         EPS         
+
+                           LOWER          LEVEL          UPPER         MARGINAL
+
+---- EQU cbal                .              .              .             0.7500      
+
+  cbal  Calorie balance        (kcal      /capita)
+
+---- EQU dbal  Change in diet         (     grams/capita)
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+rice              139.3000       139.3000       139.3000         0.0156      
+wheat              86.7000        86.7000        86.7000         0.0156      
+barley              0.6000         0.6000         0.6000         0.0156      
+naked               0.3000         0.3000         0.3000         0.0156      
+corn                1.5000         1.5000         1.5000         0.0156      
+sorghum              .              .              .             0.0156      
+mis_grains          1.8000         1.8000         1.8000         0.0156      
+sweetp             10.5000        10.5000        10.5000         0.0156      
+potato             47.2000        47.2000        47.2000         0.0156      
+soy                18.4000        18.4000        18.4000         0.0156      
+mis_beans           6.2000         6.2000         6.2000         0.0156      
+green_veges        71.7000        71.7000        71.7000         0.0156      
+mis_veges         169.7000       169.7000       169.7000         0.0156      
+mandarin            9.3000         9.3000         9.3000         0.0156      
+apple              20.8000        20.8000        20.8000         0.0156      
+mis_fruits         60.7000        60.7000        60.7000         0.0156      
+
+                           LOWER          LEVEL          UPPER         MARGINAL
+
+---- EQU objective           .              .              .             1.0000      
+
+  objective  Objective function
+
+---- VAR xcrop  Cropping area          (1000ha)
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+rice                 .          3907.5000        +INF             .          
+wheat                .           158.2500        +INF             .          
+barley               .              .            +INF            0.1495      
+naked                .              .            +INF            0.0857      
+corn                 .              .            +INF            0.1743      
+sorghum              .              .            +INF            0.0227      
+mis_grains           .              .            +INF            0.1368      
+sweetp               .            80.7500        +INF             .          
+potato               .           178.5000        +INF             .          
+soy                  .            70.0250        +INF             .          
+mis_beans            .            88.2250        +INF             .          
+green_veges          .              .            +INF            0.0866      
+mis_veges            .              .            +INF            0.0581      
+mandarin             .              .            +INF            0.0767      
+apple                .              .            +INF            0.0299      
+mis_fruits           .              .            +INF            0.0992      
+
+---- VAR ndeficit  Deficit of nutrients   (kcal grams/capita)
+
+                     LOWER          LEVEL          UPPER         MARGINAL
+
+calorie              -INF          868.8168        +INF             .          
+protein              -INF           45.8571        +INF             .          
+fat                  -INF           60.8111        +INF             .          
+carbonhydrate        -INF           34.5224        +INF             .          
+
+                           LOWER          LEVEL          UPPER         MARGINAL
+
+---- VAR cdeficit          -INF          868.8168        +INF             .          
+
+  cdeficit  Deficit of calorie     (kcal      /capita)
+
+---- VAR delta  Change in diet         (     grams/capita)
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+rice               -INF         -202.0984        +INF             .          
+wheat              -INF           77.4304        +INF             .          
+barley             -INF            0.6000        +INF             .          
+naked              -INF            0.3000        +INF             .          
+corn               -INF            1.5000        +INF             .          
+sorghum            -INF             .            +INF             .          
+mis_grains         -INF            1.8000        +INF             .          
+sweetp             -INF          -14.6558        +INF             .          
+potato             -INF          -29.2567        +INF             .          
+soy                -INF           17.8696        +INF             .          
+mis_beans          -INF            3.4667        +INF             .          
+green_veges        -INF           71.7000        +INF             .          
+mis_veges          -INF          169.7000        +INF             .          
+mandarin           -INF            9.3000        +INF             .          
+apple              -INF           20.8000        +INF             .          
+mis_fruits         -INF           60.7000        +INF             .          
+
+                           LOWER          LEVEL          UPPER         MARGINAL
+
+---- VAR target            -INF          654.5682        +INF             .          
+
+  target  Target value to minimize
+
+
+**** REPORT SUMMARY :        0     NONOPT
+                             0 INFEASIBLE
+                             0  UNBOUNDED
+                             0     ERRORS
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/12/23 10:12:24 Page 13
+Nutrition-Cropping Optimization Model
+E x e c u t i o n
+
+
+----    241 landuse   -- Cropped area              (1000ha)
+            supply    -- Total food supply         (1000t)
+            grossfood -- Gross food supply         (1000t)
+            netfood   -- Net food supply           (1000t)
+            current   -- Current intake            (grams/capita)
+            potential -- Potential intake          (grams/capita)
+            change    -- Change in daily diet      (grams/capita)
+            required  -- Required daily nutrients  (kcal grams/capita)
+            intake    -- Intaken nutrients per day (kcal grams/capita)
+            shortage  -- Shortage per day          (kcal grams/capita)
+            ssrate    -- Self sufficient rate      (percentage)
+
+----    241 PARAMETER landrep  Land report summary
+
+           rice       wheat      sweetp      potato         soy   mis_beans       total
+
+jan                 158.250                                                     158.250
+feb                 158.250                                                     158.250
+mar                 158.250                                                     158.250
+apr    3907.500     158.250                  89.250                            4155.000
+may    3907.500     158.250      40.375     178.500                            4284.625
+jun    3907.500     158.250      80.750     178.500                            4325.000
+jul    3907.500                  80.750     178.500      70.025      88.225    4325.000
+aug    3907.500                  80.750     178.500      70.025      88.225    4325.000
+sep    3907.500                  80.750     178.500      70.025      88.225    4325.000
+oct    3907.500                             178.500      70.025      88.225    4244.250
+nov                 158.250                              70.025      88.225     316.500
+dec                 158.250                              70.025      88.225     316.500
+
+
+----    241 PARAMETER croprep  Crop report summary
+
+                landuse      supply   grossfood     netfood     current   potential      change
+
+rice           3907.500   20182.500   17185.511   15570.073     139.300     341.398     202.098
+wheat           158.250     691.552     541.996     422.757      86.700       9.270     -77.430
+barley                                                            0.600                  -0.600
+naked                                                             0.300                  -0.300
+corn                                                              1.500                  -1.500
+mis_grains                                                        1.800                  -1.800
+sweetp           80.750    1776.500    1260.742    1147.275      10.500      25.156      14.656
+potato          178.500    5712.000    3874.381    3486.943      47.200      76.457      29.257
+soy              70.025     112.040      24.191      24.191      18.400       0.530     -17.870
+mis_beans        88.225     170.325     141.494     124.656       6.200       2.733      -3.467
+green_veges                                                      71.700                 -71.700
+mis_veges                                                       169.700                -169.700
+mandarin                                                          9.300                  -9.300
+apple                                                            20.800                 -20.800
+mis_fruits                                                       60.700                 -60.700
+total          4483.250   28644.917   23028.316   20775.896     644.700     455.544    -189.156
+
+
+----    241 PARAMETER dietrep  Nutrient summary
+
+                 required      intake    shortage      ssrate
+
+calorie          2157.786    1288.969    -868.817      59.736
+protein            70.128      24.271     -45.857      34.610
+fat                64.734       3.923     -60.811       6.059
+carbonhydrate     323.668     289.145     -34.522      89.334
+
+
+
+EXECUTION TIME       =        9.406 SECONDS      4 MB  32.2.0 rc62c018 WEX-WEI
+
+
+USER: Kiyotaka Ishikawa, Single User License         G191217/0001AS-WIN
+      Kyoto University, Graduate School of Agriculture          DC10515
+      License for teaching and research at degree granting institutions
+
+
+**** FILE SUMMARY
+
+Input      C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\build1.1.gms
+Output     C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\build1.1.lst
