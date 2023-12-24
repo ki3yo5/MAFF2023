@@ -1,6 +1,21 @@
 # MAFF2023
 Pre-simulation for DSS-ESSA
 
+Build 1.3 Dec 24 2023
+
+Cropping model with 16 crops, 2 marine products, 6 processing foods.
+Objective function is calorie deficit and nutrient intake balance only.
+Contstraints on land size by each type and 300% margin for each cropiing area.
+Cropping on pasture, orchard, local plants are exception.
+Calorie and nutrient balance is optimized for the total population per day.
+
+Build 1.2 Dec 23 2023
+
+Cropping model with 16 crops but without livestock and processing foods.
+Objective function is calorie deficit and nutrient intake balance only.
+Contstraints on land size by each type and 500% margin for each cropiing area.
+Calorie and nutrient balance is optimized for the total population per day.
+
 Build 1.1 Dec 12 2023
 
 Cropping model with 16 crops but without livestock and processing foods.
