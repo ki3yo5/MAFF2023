@@ -1,0 +1,44 @@
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/24/23 12:11:51 Page 1
+Data export
+C o m p i l a t i o n
+
+
+   2   
+   3  parameter
+   4    data(*,*)      Production data
+   5    landreq(*,*)   Months of land occupation by crop (hectares)
+   6    intake(*,*,*)  Required daily intake of nutrients
+   7    nvalue(*,*,*)  Nutritive supply and value of foods;
+   8   
+  13   
+  14   
+  15   
+GAMS 32.2.0  rc62c018 Released Aug 26, 2020 WEX-WEI x86 64bit/MS Windows - 12/24/23 12:11:51 Page 2
+Data export
+Include File Summary
+
+
+   SEQ   GLOBAL TYPE      PARENT   LOCAL  FILENAME
+
+     1        1 INPUT          0       0  C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\xlsx2gdx.gms
+     2        9 CALL           1       9  gdxxrw prod.xlsx par=data rng=prod!a1:enh3582 Rdim=1 Cdim=1
+     3       10 CALL           1      10  gdxxrw landreq.xlsx par=landreq rng=landreq!a1:enh3582 Rdim=1 Cdim=1
+     4       11 CALL           1      11  gdxxrw intake.xlsx par=intake rng=intake!a1:enh3582 Rdim=1 Cdim=2
+     5       12 CALL           1      12  gdxxrw nvalue.xlsx par=nvalue rng=nvalue!a1:enh3582 Rdim=1 Cdim=2
+
+
+COMPILATION TIME     =        7.515 SECONDS      2 MB  32.2.0 rc62c018 WEX-WEI
+
+
+EXECUTION TIME       =        0.000 SECONDS      2 MB  32.2.0 rc62c018 WEX-WEI
+
+
+USER: Kiyotaka Ishikawa, Single User License         G191217/0001AS-WIN
+      Kyoto University, Graduate School of Agriculture          DC10515
+      License for teaching and research at degree granting institutions
+
+
+**** FILE SUMMARY
+
+Input      C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\xlsx2gdx.gms
+Output     C:\Users\ikiyo\OneDrive\MAFF_2023\workspace\xlsx2gdx.lst
