@@ -1,4 +1,16 @@
 # MAFF2023
+Pre-simulation for Swiss Model
+
+Build 1.1 Jun 11 2024
+
+Simple model with 13 feeds, 7 livestocks, 5 animal products.
+Objective function for calorie deficit weighted with 0,75 and diet balance.
+Contstraints on feed distribution and TDN and CP balance.
+Stock release scenario added.
+
+Ishikawa K., Pre-simulation for Suiss Model. The MAFF Open Lab, 2024.
+
+--------------------------------------------------------------------------------------
 Pre-simulation for DSS-ESSA
 
 Build 1.5 Jan 13 2024
