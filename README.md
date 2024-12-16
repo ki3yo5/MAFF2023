@@ -1,14 +1,17 @@
 # MAFF2023
-Pre-simulation for Swiss Model
+Pre-simulation for SWISSfoodsys
 
-F&L 1.1 Jun 11 2024
+Build 2.1 Nov 28 2024
 
-Simple model with 13 feeds, 7 livestocks, 5 animal products.
-Objective function for calorie deficit weighted with 0,75 and diet balance.
-Contstraints on feed distribution and TDN and CP balance.
-Stock release scenario added.
+Cropping model with 16 crops, 2 marine products, 6 processing foods.
+Livestock model with 13 feeds, 7 livestocks, 5 animal products.
+Objective function is calorie deficit and food intake balance of 8 food groups.
+Contstraints on cropping with arable land endowments and expansion margins for each crops.
+Contstraints on livestock production with feed distribution and feed TDN and CP balance.
+Simultaneous simulation for croping and animal production models.
+Optional module for import decline.  
 
-Ishikawa K., Pre-simulation for Suiss Model. The MAFF Open Lab, 2024.
+Ishikawa K., (2024), Pre-simulation for Swiss Food Model. The MAFF Open Lab.
 
 --------------------------------------------------------------------------------------
 Pre-simulation for DSS-ESSA
